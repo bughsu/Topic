@@ -1,0 +1,117 @@
+#include "eventlogger.h"
+#include <QCoreApplication>
+#include <QDir>
+#include <QDebug>
+
+EventLogger::EventLogger() {
+    // 設定日誌檔案路徑
+    QString appDir = QCoreApplication::applicationDirPath();
+    QDir().mkpath(appDir + "/logs");
+    m_logFilePath = appDir + "/logs/event_log.json";
+
+    // 自動載入既有的日誌
+    loadFromFile(m_logFilePath);
+}
+
+EventLogger::~EventLogger() {
+    // 自動保存
+    saveToFile(m_logFilePath);
+}
+
+void EventLogger::logEvent(EventType type, const QString &streamUrl, const QString &description,
+                            double motionLevel, const QString &snapshotPath) {
+    EventRecord record;
+    record.timestamp = QDateTime::currentDateTime();
+    record.type = type;
+    record.streamUrl = streamUrl;
+    record.description = description;
+    record.motionLevel = motionLevel;
+    record.imageSnapshotPath = snapshotPath;
+
+    m_events.append(record);
+
+    // 即時保存到檔案
+    saveToFile(m_logFilePath);
+
+    qDebug() << "事件記錄:" << record.getTypeString() << "-" << description;
+}
+
+QList<EventRecord> EventLogger::getAllEvents() const {
+    return m_events;
+}
+
+QList<EventRecord> EventLogger::getEventsByType(EventType type) const {
+    QList<EventRecord> filtered;
+    for (const EventRecord &record : m_events) {
+        if (record.type == type) {
+            filtered.append(record);
+        }
+    }
+    return filtered;
+}
+
+QList<EventRecord> EventLogger::getEventsByTimeRange(const QDateTime &start, const QDateTime &end) const {
+    QList<EventRecord> filtered;
+    for (const EventRecord &record : m_events) {
+        if (record.timestamp >= start && record.timestamp <= end) {
+            filtered.append(record);
+        }
+    }
+    return filtered;
+}
+
+void EventLogger::clearEvents() {
+    m_events.clear();
+    saveToFile(m_logFilePath);
+}
+
+bool EventLogger::saveToFile(const QString &filePath) {
+    QJsonArray jsonArray;
+    for (const EventRecord &record : m_events) {
+        jsonArray.append(record.toJson());
+    }
+
+    QJsonDocument doc(jsonArray);
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly)) {
+        qWarning() << "無法開啟日誌檔案以寫入:" << filePath;
+        return false;
+    }
+
+    file.write(doc.toJson());
+    file.close();
+    return true;
+}
+
+bool EventLogger::loadFromFile(const QString &filePath) {
+    QFile file(filePath);
+    if (!file.exists()) {
+        qDebug() << "日誌檔案不存在，將建立新的日誌:" << filePath;
+        return true;
+    }
+
+    if (!file.open(QIODevice::ReadOnly)) {
+        qWarning() << "無法開啟日誌檔案以讀取:" << filePath;
+        return false;
+    }
+
+    QByteArray data = file.readAll();
+    file.close();
+
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+    if (!doc.isArray()) {
+        qWarning() << "日誌檔案格式錯誤";
+        return false;
+    }
+
+    m_events.clear();
+    QJsonArray jsonArray = doc.array();
+    for (const QJsonValue &value : jsonArray) {
+        if (value.isObject()) {
+            m_events.append(EventRecord::fromJson(value.toObject()));
+        }
+    }
+
+    qDebug() << "載入" << m_events.size() << "筆事件記錄";
+    return true;
+}

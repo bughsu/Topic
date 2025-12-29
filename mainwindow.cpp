@@ -360,6 +360,8 @@ void MainWindow::onPlaySelectedLive() {
     });
 
     // 使用計時器定期擷取影格進行分析（每500ms一次）
+    // 注意：頻率已優化以平衡偵測效能和 CPU 使用率
+    // 若需更高偵測精度，可降低至 250ms；若需降低 CPU 使用，可提高至 1000ms
     connect(unit->frameGrabTimer, &QTimer::timeout, this, [this, unit](){
         if (unit->motionDetector && unit->motionDetector->isEnabled()) {
             QVideoSink *videoSink = unit->videoWidget->videoSink();
@@ -845,10 +847,10 @@ void MainWindow::onToggleMotionDetection(bool checked) {
 
     if (checked) {
         m_motionDetectBtn->setText("停用移動偵測");
-        m_eventLogger->logEvent(EventType::RecordingStarted, "系統", "移動偵測已啟用");
+        m_eventLogger->logEvent(EventType::MotionDetectionEnabled, "系統", "移動偵測已啟用");
     } else {
         m_motionDetectBtn->setText("啟用移動偵測");
-        m_eventLogger->logEvent(EventType::RecordingStopped, "系統", "移動偵測已停用");
+        m_eventLogger->logEvent(EventType::MotionDetectionDisabled, "系統", "移動偵測已停用");
     }
 }
 

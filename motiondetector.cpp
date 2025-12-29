@@ -8,6 +8,8 @@ MotionDetector::MotionDetector(QObject *parent)
     , m_lastMotionLevel(0.0)
     , m_consecutiveMotionFrames(0)
     , m_minConsecutiveFrames(3)  // 需要連續 3 幀才觸發，減少誤報
+    , m_cooldownFrames(10)       // 觸發後冷卻 10 幀（約 5 秒）
+    , m_currentCooldown(0)
 {
     // 建立 MOG2 背景減除器（推薦用於移動偵測）
     m_backgroundSubtractor = cv::createBackgroundSubtractorMOG2(500, 16.0, true);
@@ -26,6 +28,7 @@ void MotionDetector::setEnabled(bool enabled) {
         // 重置狀態
         m_previousFrame.release();
         m_consecutiveMotionFrames = 0;
+        m_currentCooldown = 0;
         m_lastMotionLevel = 0.0;
     }
 }
@@ -67,6 +70,12 @@ void MotionDetector::processFrame(const QImage &frame) {
     double motionLevel = calculateMotionLevel(foregroundMask);
     m_lastMotionLevel = motionLevel;
 
+    // 如果在冷卻期間，遞減計數器
+    if (m_currentCooldown > 0) {
+        m_currentCooldown--;
+        return;
+    }
+
     // 判斷是否超過閾值
     if (motionLevel > m_motionThreshold) {
         m_consecutiveMotionFrames++;
@@ -76,8 +85,9 @@ void MotionDetector::processFrame(const QImage &frame) {
             qDebug() << "移動偵測觸發！強度:" << motionLevel;
             emit motionDetected(motionLevel, frame);
             
-            // 重置計數器，避免同一個移動事件重複觸發
+            // 進入冷卻期，避免同一個移動事件重複觸發
             m_consecutiveMotionFrames = 0;
+            m_currentCooldown = m_cooldownFrames;
         }
     } else {
         // 重置計數器

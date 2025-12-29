@@ -3,7 +3,7 @@
 #include <QDir>
 #include <QDebug>
 
-EventLogger::EventLogger() {
+EventLogger::EventLogger() : m_needsSave(false) {
     // 設定日誌檔案路徑
     QString appDir = QCoreApplication::applicationDirPath();
     QDir().mkpath(appDir + "/logs");
@@ -11,11 +11,24 @@ EventLogger::EventLogger() {
 
     // 自動載入既有的日誌
     loadFromFile(m_logFilePath);
+
+    // 建立定期保存計時器（每 30 秒保存一次）
+    m_saveTimer = new QTimer(this);
+    connect(m_saveTimer, &QTimer::timeout, this, [this](){
+        if (m_needsSave) {
+            saveToFile(m_logFilePath);
+            m_needsSave = false;
+        }
+    });
+    m_saveTimer->start(30000);  // 30 秒
 }
 
 EventLogger::~EventLogger() {
-    // 自動保存
-    saveToFile(m_logFilePath);
+    // 確保所有未保存的事件都被寫入
+    if (m_needsSave) {
+        saveToFile(m_logFilePath);
+    }
+    delete m_saveTimer;
 }
 
 void EventLogger::logEvent(EventType type, const QString &streamUrl, const QString &description,
@@ -29,11 +42,16 @@ void EventLogger::logEvent(EventType type, const QString &streamUrl, const QStri
     record.imageSnapshotPath = snapshotPath;
 
     m_events.append(record);
-
-    // 即時保存到檔案
-    saveToFile(m_logFilePath);
+    m_needsSave = true;  // 標記需要保存
 
     qDebug() << "事件記錄:" << record.getTypeString() << "-" << description;
+}
+
+void EventLogger::forceSave() {
+    if (m_needsSave) {
+        saveToFile(m_logFilePath);
+        m_needsSave = false;
+    }
 }
 
 QList<EventRecord> EventLogger::getAllEvents() const {
@@ -63,6 +81,7 @@ QList<EventRecord> EventLogger::getEventsByTimeRange(const QDateTime &start, con
 void EventLogger::clearEvents() {
     m_events.clear();
     saveToFile(m_logFilePath);
+    m_needsSave = false;
 }
 
 bool EventLogger::saveToFile(const QString &filePath) {

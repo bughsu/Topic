@@ -8,10 +8,13 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QTimer>
 
 // 事件類型
 enum class EventType {
     MotionDetected,
+    MotionDetectionEnabled,      // 新增
+    MotionDetectionDisabled,     // 新增
     RecordingStarted,
     RecordingStopped,
     StreamConnected,
@@ -55,6 +58,8 @@ struct EventRecord {
     QString getTypeString() const {
         switch(type) {
         case EventType::MotionDetected: return "移動偵測";
+        case EventType::MotionDetectionEnabled: return "啟用移動偵測";
+        case EventType::MotionDetectionDisabled: return "停用移動偵測";
         case EventType::RecordingStarted: return "開始錄影";
         case EventType::RecordingStopped: return "停止錄影";
         case EventType::StreamConnected: return "串流連接";
@@ -92,12 +97,17 @@ public:
     // 從檔案載入
     bool loadFromFile(const QString &filePath);
 
+    // 強制保存（立即寫入）
+    void forceSave();
+
     // 獲取事件數量
     int getEventCount() const { return m_events.size(); }
 
 private:
     QList<EventRecord> m_events;
     QString m_logFilePath;
+    bool m_needsSave;  // 新增：標記是否需要保存
+    QTimer *m_saveTimer;  // 新增：定期保存計時器
 };
 
 #endif // EVENTLOGGER_H

@@ -57,6 +57,10 @@ private:
     // 需要連續幾幀才觸發事件（減少誤報）
     int m_minConsecutiveFrames;
 
+    // 冷卻時間（避免重複觸發）
+    int m_cooldownFrames;
+    int m_currentCooldown;
+
     // 將 QImage 轉換為 cv::Mat
     cv::Mat qImageToMat(const QImage &image);
 

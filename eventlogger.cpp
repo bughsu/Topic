@@ -28,7 +28,7 @@ EventLogger::~EventLogger() {
     if (m_needsSave) {
         saveToFile(m_logFilePath);
     }
-    delete m_saveTimer;
+    // m_saveTimer will be automatically deleted by Qt's parent-child ownership
 }
 
 void EventLogger::logEvent(EventType type, const QString &streamUrl, const QString &description,
